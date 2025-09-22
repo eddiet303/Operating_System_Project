@@ -15,7 +15,5 @@ int main() {
 	cin >> password;
 	cout << endl;
 
-	cout<<"Test";
-
 	return 0;
 }
