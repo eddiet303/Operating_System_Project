@@ -1,16 +1,16 @@
 # Operating System Simulator
 
 ## Project Overview
-CSCE4326 - Operating Systems  
-Instructor: Dr. Elvira Teran 
-Fall 2025
 
-Team Members: 
-Eduardo Torres,
-Marlon Chavez,
-Jose Santos
+* This project is a simplified operating system simulator written in C++ that focuses on simulating a boot-up process, and implemeting a authentication system.
+* CSCE4326 - Operating Systems  
+* Instructor: Dr. Elvira Teran 
+(Fall 2025)
 
-This project is a simplified operating system simulator written in C++.
+# Team Members 
+* Eduardo Torres
+* Marlon Chavez
+* Jose Santos
 
 ## Code Explanation
 The simulator is written in C++ and is divided into three main files: 
