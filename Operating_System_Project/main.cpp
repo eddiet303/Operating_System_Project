@@ -9,7 +9,10 @@ int main() {
 	string username, password;
 	cout << "OS is booting up..." << endl;
 
-	while (true){
+	int attempts = 0;
+	const int maxAttempts = 3;
+
+	while (attempts < maxAttempts){
 	cout << "Enter username: ";
 	cin >> username;
 	cout << endl;
@@ -20,6 +23,7 @@ int main() {
 	if (authenticateUser(username, password)) {
 		break;
 	}
+		attempts++;
 }
 	return 0;
 }
