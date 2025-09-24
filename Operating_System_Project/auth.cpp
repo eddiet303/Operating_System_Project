@@ -4,10 +4,12 @@
 
 using namespace std;
 
-bool authenticateUser(string validUsername, string validPassword){
+bool authenticateUser(const string& validUsername, const string& validPassword){
 
 	const string validUser = "Administrator";
 	const string validPass = "Hello123#";
+
+	const bool ok = (validUsername == validUser && validPassword == validPass);
 
 	if (validUsername == validUser && validPassword == validPass) {
 		cout << "Access Granted. Welcome " << validUsername << endl;
@@ -17,3 +19,4 @@ bool authenticateUser(string validUsername, string validPassword){
 	}
 	return (validUsername == validUser && validPassword == validPass);
 }
+
