@@ -1,3 +1,7 @@
+/*
+auth. h declares the function authenticateUser
+*/
+
 #pragma once
 #ifndef AUTH_H
 #define AUTH_H
