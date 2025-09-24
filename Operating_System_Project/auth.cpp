@@ -4,6 +4,9 @@
 
 using namespace std;
 
+//Definition of the bool and creation of the credential to a succesfull login. 
+//Also the input user is compare to the authentication real credentials
+
 bool authenticateUser(string validUsername, string validPassword){
 
 	const string validUser = "Administrator";
@@ -17,3 +20,4 @@ bool authenticateUser(string validUsername, string validPassword){
 	}
 	return (validUsername == validUser && validPassword == validPass);
 }
+
