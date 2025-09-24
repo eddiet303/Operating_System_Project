@@ -3,6 +3,6 @@
 #define AUTH_H
 #include<string>
 
-bool authenticateUser(const std::string validUsername, const std::string validPassword);
+bool authenticateUser(const std::string& validUsername, const std::string& validPassword);
 
 #endif
