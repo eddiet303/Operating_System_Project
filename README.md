@@ -1,8 +1,8 @@
-# Operating System Simulator
+# Operating Process System Simulator
 
 ## Project Overview
 
-* This project is a simplified operating system simulator written in C++ that focuses on simulating a boot-up process, and implemeting a authentication system.
+* This project is a simplified operating system simulator with focus on the process state written in C++ that focuses on simulating a boot-up process, and implemeting a authentication system. Also is include a class (Process) that represent a class process.
 * CSCE4326 - Operating Systems  
 * Instructor: Dr. Elvira Teran 
 (Fall 2025)
