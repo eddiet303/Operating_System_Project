@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "C/C++: cl.exe build project (all .cpp)",
+      "type": "shell",
+      "command": "cl.exe",
+      "args": [
+        "/Zi",
+        "/EHsc",
+        "/Fe:app.exe",
+        "*.cpp"
+      ],
+      "problemMatcher": ["$msCompile"],
+      "group": { "kind": "build", "isDefault": true },
+      "options": {
+        "cwd": "${workspaceFolder}\\Operating_System_Project"
+      }
+    }
+  ]
+}
