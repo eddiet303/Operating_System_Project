@@ -1,6 +1,9 @@
 #include<iostream>
 #include<string>
 #include "auth.h"
+
+//simulate time passing and print each step as the process changes states
+// To simulate we need a loop in main.cpp to “drive” process state
 //#include "Process.h"
 //
 using namespace std;
