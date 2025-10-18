@@ -1,6 +1,10 @@
 #include<iostream>
 #include<string>
+//New
 #include "auth.h"
+//#include "Process.h"
+//#include <thread>   // for sleep_for
+//#include <chrono>   // for seconds
 
 //simulate time passing and print each step as the process changes states
 // To simulate we need a loop in main.cpp to “drive” process state
@@ -8,6 +12,12 @@
 //
 using namespace std;
 
+
+//New loop to simulte the a running process
+
+
+
+/////////////////////////////////////////
 int main() {
 
 	//Variables for user input
