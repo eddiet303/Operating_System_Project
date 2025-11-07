@@ -170,3 +170,6 @@ vector<ExecutionSlice> Scheduler::run(ScheduleType method, vector<Process>& proc
     if (method == ScheduleType::SJF)  return runSJF(processes);
     return runSRTF(processes);
 }
+//https://www.tutorialspoint.com/cplusplus-program-for-shortest-job-first-sjf-scheduling-preemptive
+//https://www.geeksforgeeks.org/dsa/program-for-shortest-job-first-or-sjf-cpu-scheduling-set-1-non-preemptive/
+//https://labex.io/tutorials/cpp-c-program-for-fcfs-scheduling-algorithm-96161
