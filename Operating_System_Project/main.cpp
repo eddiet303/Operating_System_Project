@@ -1,141 +1,106 @@
 #include <iostream>
-#include <string>
 #include <vector>
-#include <queue>
+#include <string>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+#include <algorithm>
 #include "auth.h"
 #include "Process.h"
+#include "scheduler.h"
 using namespace std;
 
+static int min_arrival(const vector<Process>& P){
+    if (P.empty()) return 0;
+    int m = P[0].getArrivalTime();
+    for (size_t i = 1; i < P.size(); ++i) m = min(m, P[i].getArrivalTime());
+    return m;
+}
+static int max_end(const vector<ExecutionSlice>& g){
+    int m = 0;
+    for (auto& s : g) m = max(m, s.endTime);
+    return m;
+}
+
 int main() {
-    cout << "OS boot… done\n";
+    cout << "OS boot... done\n";
 
-    string username, password;
-    int attempts = 0;
-    while (attempts < 3) {
+    string user, pass;
+    int tries = 0;
+    while (tries < 3) {
         cout << "Admin Login\n";
-        cout << "Username: ";
-        cin >> username;                  // visible input
-        cout << "Password: ";
-        cin >> password;                  // visible input
-        if (authenticateUser(username, password)) break;
-        attempts++;
-        if (attempts == 3) {
-            cout << "Too many attempts. Exiting.\n";
-            return 1;
-        }
-        cout << "Invalid. Try again.\n";
+        cout << "Username: "; cin >> user;
+        cout << "Password: "; cin >> pass;
+        if (authenticateUser(user, pass)) break;
+        ++tries;
+        if (tries == 3) { cout << "Too many attempts. Exiting.\n"; return 1; }
+        cout << "Invalid credentials. Try again.\n";
     }
 
-    // Demo workload: pid, arrival, burst, priority, mem, io_flag
-    vector<Process> procs;
-    vector<int> arrival = {0, 1, 2};
-    procs.emplace_back(1, arrival[0], 5, 1, 64, false);
-    procs.emplace_back(2, arrival[1], 3, 1, 32, true);
-    procs.emplace_back(3, arrival[2], 4, 2, 16, false);
+    int n;
+    cout << "\nEnter number of processes: ";
+    cin >> n;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
 
-    const int n = (int)procs.size();
-
-    enum VState { V_NEW, V_READY, V_RUNNING, V_WAITING, V_TERMINATED };
-    vector<VState> vstate(n, V_NEW);
-    queue<int> ready;
-
-    auto allDone = [&]() {
-        for (int i = 0; i < n; ++i) if (!procs[i].isComplete()) return false;
-        return true;
-    };
-
-    int t = 0;
-    cout << "\n=== Simulation start ===\n";
-    for (int i = 0; i < n; ++i) if (arrival[i] == 0) { ready.push(i); vstate[i] = V_READY; }
-
-    while (!allDone()) {
-        for (int i = 0; i < n; ++i) {
-            if (vstate[i] == V_NEW && arrival[i] <= t) {
-                ready.push(i);
-                vstate[i] = V_READY;
-            }
-        }
-
-        int running = -1;
-        if (!ready.empty()) {
-            running = ready.front();
-            ready.pop();
-            vstate[running] = V_RUNNING;
-        }
-
-        cout << "\n[Time " << t << "]\n";
-        if (running != -1) cout << "RUN:    P" << procs[running].getPid() << "\n";
-        else               cout << "RUN:    (idle)\n";
-
-        vector<int> readySnap;
-        {
-            queue<int> tmp = ready;
-            while (!tmp.empty()) { readySnap.push_back(tmp.front()); tmp.pop(); }
-        }
-        cout << "READY:  ";
-        if (readySnap.empty()) cout << "{}\n";
-        else {
-            cout << "{";
-            for (size_t k = 0; k < readySnap.size(); ++k) {
-                cout << "P" << procs[readySnap[k]].getPid();
-                if (k + 1 < readySnap.size()) cout << ",";
-            }
-            cout << "}\n";
-        }
-
-        cout << "STATE:  ";
-        for (int i = 0; i < n; ++i) {
-            const char* label =
-                vstate[i] == V_NEW        ? "NEW" :
-                vstate[i] == V_READY      ? "READY" :
-                vstate[i] == V_RUNNING    ? "RUNNING" :
-                vstate[i] == V_WAITING    ? "WAITING" : "TERMINATED";
-            cout << "P" << procs[i].getPid() << "=" << label << (i + 1 < n ? "  " : "\n");
-        }
-
-        if (running != -1) {
-            procs[running].decrementRemainingTime(1);
-            for (int i = 0; i < n; ++i) {
-                if (i == running) continue;
-                if (!procs[i].isComplete() && vstate[i] != V_NEW && vstate[i] != V_TERMINATED) {
-                    procs[i].incrementWaitingTime(1);
-                }
-            }
-        }
-
-        t += 1;
-
-        if (running != -1) {
-            if (procs[running].isComplete()) {
-                vstate[running] = V_TERMINATED;
-                procs[running].setTurnaroundTime(t - arrival[running]);
-            } else {
-                bool goIO = false;
-                if ((procs[running].getPid() % 2 == 0) && (t % 3 == 0)) goIO = true;
-                if (goIO) {
-                    vstate[running] = V_WAITING;
-                } else {
-                    vstate[running] = V_READY;
-                    ready.push(running);
-                }
-            }
-        }
-
-        for (int i = 0; i < n; ++i) {
-            if (vstate[i] == V_WAITING && !procs[i].isComplete()) {
-                vstate[i] = V_READY;
-                ready.push(i);
-            }
-        }
-    }
-
-    cout << "\n=== All processes finished at time " << t << " ===\n\n";
-    cout << "PID\tState\n";
+    vector<int> pids(n), at(n), bt(n);
     for (int i = 0; i < n; ++i) {
-        cout << procs[i].getPid() << "\t" << procs[i].getStateName() << "\n";
+        while (true) {
+            cout << "P" << (i + 1) << " -> PID Arrival Burst: ";
+            string line; getline(cin, line);
+            istringstream iss(line);
+            if (iss >> pids[i] >> at[i] >> bt[i]) break;
+            cout << "Please enter three integers: <PID> <Arrival> <Burst>\n";
+        }
     }
-    cout << "\nDetails:\n";
-    for (const auto& p : procs) p.display();
 
+    vector<Process> procs;
+    procs.reserve(n);
+    for (int i = 0; i < n; ++i) procs.emplace_back(pids[i], at[i], bt[i], 1, 0, false);
+
+    cout << "\nChoose Scheduling Algorithm:\n"
+            "  1) FCFS\n"
+            "  2) SJF (non-preemptive)\n"
+            "  3) SRTF (preemptive SJF)\n"
+            "Select: ";
+    int choice; cin >> choice;
+    ScheduleType method = ScheduleType::FCFS;
+    if (choice == 2) method = ScheduleType::SJF;
+    else if (choice == 3) method = ScheduleType::SRTF;
+
+    auto gantt = Scheduler::run(method, procs);
+
+    cout << "\n=== Gantt Timeline ===\n";
+    for (auto& s : gantt) {
+        cout << "[t=" << setw(2) << s.startTime << "→" << setw(2) << s.endTime << "] P" << s.pid << "\n";
+    }
+
+    cout << "\n=== Per-Tick View ===\n";
+    int startT = procs.empty() ? 0 : min_arrival(procs);
+    int endT = max_end(gantt);
+    for (int t = startT; t < endT; ++t) {
+        int runningPid = -1;
+        for (auto& s : gantt) if (t >= s.startTime && t < s.endTime) { runningPid = s.pid; break; }
+        cout << "[Time " << t << "] RUN: ";
+        if (runningPid == -1) cout << "(idle)\n"; else cout << "P" << runningPid << "\n";
+    }
+
+    double avgTAT = 0.0, avgWT = 0.0;
+    cout << "\n=== Results ===\n";
+    cout << "PID\tAT\tBT\tCT\tTAT\tWT\n";
+    for (const auto& p : procs) {
+        int pid = p.getPid();
+        int arrival = p.getArrivalTime();
+        int burst = p.getBurstTime();
+        int completion = 0;
+        for (auto& s : gantt) if (s.pid == pid) completion = max(completion, s.endTime);
+        int tat = p.getTurnaroundTime();
+        int wt  = p.getWaitingTime();
+        avgTAT += tat; avgWT += wt;
+        cout << pid << '\t' << arrival << '\t' << burst << '\t' << completion << '\t' << tat << '\t' << wt << '\n';
+    }
+    if (n > 0) { avgTAT /= n; avgWT /= n; }
+    cout << fixed << setprecision(2);
+    cout << "Average Turnaround Time: " << avgTAT << "\n";
+    cout << "Average Waiting Time:    " << avgWT << "\n";
     return 0;
 }
