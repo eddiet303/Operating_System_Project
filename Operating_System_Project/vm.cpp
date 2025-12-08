@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iomanip>
 #include <random>
+#include <utility>
 
 using std::vector; using std::uint8_t; using std::size_t; using std::string;
 
@@ -13,31 +14,42 @@ void VirtualMemory::init(size_t ps, int vp, int fr, int tlbSz, const string& pol
     PAGE_SIZE = ps; VPN_COUNT = vp; FRAME_COUNT = fr; TLB_SIZE = tlbSz; policy = pol;
     backing.assign(VPN_COUNT, vector<uint8_t>(PAGE_SIZE, 0));
     phys.assign(FRAME_COUNT, vector<uint8_t>(PAGE_SIZE, 0));
-    ptab.assign(VPN_COUNT, {}); tlb.assign(TLB_SIZE, {}); fmeta.assign(FRAME_COUNT, {});
+    ptab.assign(VPN_COUNT, PTE());
+    tlb.assign(TLB_SIZE, TLB());
+    fmeta.assign(FRAME_COUNT, FMeta());
     freeList.clear(); for (int f=0; f<FRAME_COUNT; ++f) freeList.push_back(f);
-    clockHand = 0; tlbHits=tlbMisses=faults=evictions=writebacks=reads=writes=ticks=0;
+    clockHand = 0;
+    tlbHits=0; tlbMisses=0; faults=0; evictions=0; writebacks=0; reads=0; writesCnt=0; ticks=0;
 }
 
 uint8_t VirtualMemory::read(uint64_t vaddr) {
-    touch(); auto [vpn, off] = split(vaddr); int f = translate(vpn, false);
+    touch();
+    std::pair<int,int> pr = split(vaddr);
+    int vpn = pr.first, off = pr.second;
+    int f = translate(vpn, false);
     fmeta[f].ref = true; ptab[vpn].ref = true; ++reads; return phys[f][off];
 }
 
 void VirtualMemory::write(uint64_t vaddr, uint8_t val) {
-    touch(); auto [vpn, off] = split(vaddr); int f = translate(vpn, true);
-    fmeta[f].ref = true; fmeta[f].dirty = true; ptab[vpn].ref = true; ptab[vpn].dirty = true; ++writes; phys[f][off] = val;
+    touch();
+    std::pair<int,int> pr = split(vaddr);
+    int vpn = pr.first, off = pr.second;
+    int f = translate(vpn, true);
+    fmeta[f].ref = true; fmeta[f].dirty = true; ptab[vpn].ref = true; ptab[vpn].dirty = true; ++writesCnt; phys[f][off] = val;
 }
 
 void VirtualMemory::fill(uint64_t vaddr, size_t len, uint8_t val) { for (size_t i=0;i<len;i++) write(vaddr+i, val); }
 
 void VirtualMemory::seq(uint64_t start, int ops, bool wr) {
-    for (int i=0;i<ops;i++) { uint64_t a=(start+i)%(uint64_t(VPN_COUNT)*PAGE_SIZE); if (wr) write(a, uint8_t(a&0xFF)); else (void)read(a); }
+    uint64_t total = (uint64_t)VPN_COUNT * PAGE_SIZE;
+    for (int i=0;i<ops;i++) { uint64_t a=(start+i)%total; if (wr) write(a, uint8_t(a&0xFF)); else (void)read(a); }
 }
 
 void VirtualMemory::rnd(int ops, uint64_t maxAddr, uint32_t seed, bool wr) {
     std::mt19937 rng(seed); std::uniform_int_distribution<uint64_t> A(0, maxAddr);
     std::uniform_int_distribution<int> B(0,255);
-    for (int i=0;i<ops;i++) { uint64_t a=A(rng)%(uint64_t(VPN_COUNT)*PAGE_SIZE); if (wr && (rng()&1)) write(a, uint8_t(B(rng))); else (void)read(a); }
+    uint64_t total = (uint64_t)VPN_COUNT * PAGE_SIZE;
+    for (int i=0;i<ops;i++) { uint64_t a=A(rng)%total; if (wr && (rng()&1)) write(a, uint8_t(B(rng))); else (void)read(a); }
 }
 
 void VirtualMemory::dumpVpn(int vpn) const {
@@ -62,8 +74,8 @@ void VirtualMemory::dumpFrame(int f) const {
 
 void VirtualMemory::stats() const {
     double hit = (tlbHits+tlbMisses)? 100.0*tlbHits/(tlbHits+tlbMisses) : 0.0;
-    double fr  = (reads+writes)? 100.0*faults/(reads+writes) : 0.0;
-    std::cout<<"Reads "<<reads<<" Writes "<<writes<<"\n";
+    double fr  = (reads+writesCnt)? 100.0*faults/(reads+writesCnt) : 0.0;
+    std::cout<<"Reads "<<reads<<" Writes "<<writesCnt<<"\n";
     std::cout<<"TLB hits "<<tlbHits<<" misses "<<tlbMisses<<" hit% "<<std::fixed<<std::setprecision(2)<<hit<<"\n";
     std::cout<<"Faults "<<faults<<" Evictions "<<evictions<<" WriteBacks "<<writebacks<<" Fault% "<<fr<<"\n";
 }
@@ -78,7 +90,7 @@ int VirtualMemory::frameCount() const { return FRAME_COUNT; }
 std::pair<int,int> VirtualMemory::split(uint64_t vaddr) const {
     int vpn = int(vaddr / PAGE_SIZE), off = int(vaddr % PAGE_SIZE);
     if (vpn<0 || vpn>=VPN_COUNT) throw std::runtime_error("address out of range");
-    return {vpn, off};
+    return std::pair<int,int>(vpn, off);
 }
 
 int VirtualMemory::translate(int vpn, bool) {
@@ -90,14 +102,23 @@ int VirtualMemory::translate(int vpn, bool) {
 }
 
 int VirtualMemory::tlbLookup(int vpn) {
-    for (auto& e : tlb) if (e.vpn==vpn) { ++tlbHits; e.age=0; return e.frame; }
+    for (size_t i=0;i<tlb.size();++i) {
+        TLB &e = tlb[i];
+        if (e.vpn==vpn) { ++tlbHits; e.age=0; return e.frame; }
+    }
     ++tlbMisses; return -1;
 }
 
 void VirtualMemory::tlbInsert(int vpn, int frame) {
-    int idx=-1; for (int i=0;i<TLB_SIZE;i++) if (tlb[i].vpn==-1) { idx=i; break; }
-    if (idx==-1) { uint64_t best=0; int bi=0; for (int i=0;i<TLB_SIZE;i++) if (tlb[i].age>=best) { best=tlb[i].age; bi=i; } idx=bi; }
-    tlb[idx] = {vpn, frame, 0};
+    int idx=-1;
+    for (int i=0;i<TLB_SIZE;i++) if (tlb[i].vpn==-1) { idx=i; break; }
+    if (idx==-1) {
+        uint64_t best=0; int bi=0;
+        for (int i=0;i<TLB_SIZE;i++) if (tlb[i].age>=best) { best=tlb[i].age; bi=i; }
+        idx=bi;
+    }
+    TLB tmp; tmp.vpn = vpn; tmp.frame = frame; tmp.age = 0;
+    tlb[idx] = tmp;
 }
 
 void VirtualMemory::pageFault(int vpn) {
@@ -118,7 +139,7 @@ int VirtualMemory::evictClock() {
         int f = clockHand; int v = fmeta[f].vpn;
         if (!ptab[v].ref) {
             if (fmeta[f].dirty || ptab[v].dirty) { ++writebacks; std::memcpy(&backing[v][0], &phys[f][0], PAGE_SIZE); }
-            ptab[v] = {}; tlbInvalidate(v); fmeta[f] = {}; clockHand = (clockHand+1)%FRAME_COUNT; return f;
+            ptab[v] = PTE(); tlbInvalidate(v); fmeta[f] = FMeta(); clockHand = (clockHand+1)%FRAME_COUNT; return f;
         }
         ptab[v].ref=false; fmeta[f].ref=false; clockHand = (clockHand+1)%FRAME_COUNT;
     }
@@ -126,14 +147,14 @@ int VirtualMemory::evictClock() {
 
 int VirtualMemory::evictLRU() {
     vector<uint64_t> age(FRAME_COUNT, 0);
-    for (auto& e: tlb) if (e.vpn!=-1) age[e.frame] = std::max(age[e.frame], e.age);
+    for (size_t i=0;i<tlb.size();++i) if (tlb[i].vpn!=-1) age[tlb[i].frame] = std::max(age[tlb[i].frame], tlb[i].age);
     int best=0; uint64_t bestAge=0;
     for (int f=0; f<FRAME_COUNT; ++f) if (age[f]>=bestAge) { bestAge=age[f]; best=f; }
     int v = fmeta[best].vpn;
     if (fmeta[best].dirty || ptab[v].dirty) { ++writebacks; std::memcpy(&backing[v][0], &phys[best][0], PAGE_SIZE); }
-    ptab[v] = {}; tlbInvalidate(v); fmeta[best] = {}; return best;
+    ptab[v] = PTE(); tlbInvalidate(v); fmeta[best] = FMeta(); return best;
 }
 
-void VirtualMemory::tlbInvalidate(int vpn) { for (auto& e: tlb) if (e.vpn==vpn) e = {}; }
+void VirtualMemory::tlbInvalidate(int vpn) { for (size_t i=0;i<tlb.size();++i) if (tlb[i].vpn==vpn) tlb[i] = TLB(); }
 
-void VirtualMemory::touch() { ++ticks; for (auto& e: tlb) if (e.vpn!=-1) ++e.age; }
+void VirtualMemory::touch() { ++ticks; for (size_t i=0;i<tlb.size();++i) if (tlb[i].vpn!=-1) ++tlb[i].age; }
