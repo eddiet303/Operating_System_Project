@@ -31,15 +31,15 @@ private:
     int VPN_COUNT, FRAME_COUNT, TLB_SIZE;
     std::string policy;
 
-    std::vector<std::vector<uint8_t>> backing;
-    std::vector<std::vector<uint8_t>> phys;
+    std::vector<std::vector<uint8_t> > backing;
+    std::vector<std::vector<uint8_t> > phys;
     std::vector<PTE> ptab;
     std::vector<TLB> tlb;
     std::vector<FMeta> fmeta;
     std::vector<int> freeList;
-    int clockHand=0;
+    int clockHand;
 
-    uint64_t tlbHits=0, tlbMisses=0, faults=0, evictions=0, writebacks=0, reads=0, writes=0, ticks=0;
+    uint64_t tlbHits, tlbMisses, faults, evictions, writebacks, reads, writesCnt, ticks;
 
     std::pair<int,int> split(uint64_t vaddr) const;
     int translate(int vpn, bool isWrite);
