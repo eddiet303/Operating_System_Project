@@ -23,12 +23,12 @@ The simulator is written in C++ and is divided into three main files:
 - `scheduler.h` The Scheduler.h file defines the scheduling system used in the simulator. It declares an enumeration for the supported algorithms: FCFS, SJF, and SRTF. It also defines the ExecutionSlice structure, which stores when and which process is running, allowing the final output to show the CPU timeline. The main Scheduler class is declared here, along with the run() function that receives a list of processes and applies the selected scheduling algorithm. Keeping this logic in a separate header organizes the project, makes the main program cleaner, and allows additional scheduling methods to be added more easily in the future.
 - `vm.cpp` implements a virtual memory simulator in C++. It models key aspects of an operating system’s virtual memory system, including page tables, TLBs (Translation Lookaside Buffers), and page replacement algorithms like LRU (Least Recently Used) and CLOCK. The code allows for reading and writing to virtual memory addresses, handling page faults, and managing the lifecycle of memory pages. It includes functions for initializing the virtual memory system, translating virtual addresses to physical addresses, and updating the TLB and page table as needed. The implementation focuses on simulating how an OS manages memory efficiently while providing the illusion of a large address space to applications. 
 - Here is an example of some predefined commands that can be used to interact with the virtual memory simulator:
-- vm> init 256 16 8 4 LRU
-- vm> write 0 42
-- vm> write 300 84
-- vm> read 0
-- vm> dumpvpn 0
-- vm> stats
+- - vm> init 256 16 8 4 LRU
+- - vm> write 0 42
+- - vm> write 300 84
+- - vm> read 0
+- - vm> dumpvpn 0
+- - vm> stats
 - `vm.h` The vm.h header file has the VirtualMemory class, which acts like a computer's Memory Management Unit (MMU). It lists the basic data structures that paging needs, such as a Page Table for mapping virtual page numbers (VPNs) to physical frames, a Translation Lookaside Buffer (TLB) for storing recent translations, and metadata structures for keeping track of frame usage. The class interface lets you read and write memory, change addresses, and manage the lifecycle of memory pages. It also lets you set system parameters like page size and replacement policies like LRU (Least Recently Used) or CLOCK.
 ## Default Credentials
 - Username: `Administrator`
