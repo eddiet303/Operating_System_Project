@@ -18,9 +18,7 @@ static int min_arrival(const vector<Process>& P){
     return m;
 }
 static int max_end(const vector<ExecutionSlice>& g){
-    int m = 0;
-    for (auto& s : g) m = max(m, s.endTime);
-    return m;
+    int m = 0; for (size_t i=0;i<g.size();++i) m = max(m, g[i].endTime); return m;
 }
 
 static void run_scheduler_flow() {
@@ -52,31 +50,31 @@ static void run_scheduler_flow() {
     ScheduleType method = ScheduleType::FCFS;
     if (choice == 2) method = ScheduleType::SJF; else if (choice == 3) method = ScheduleType::SRTF;
 
-    auto gantt = Scheduler::run(method, procs);
+    vector<ExecutionSlice> gantt = Scheduler::run(method, procs);
 
     cout << "\n=== Gantt Timeline ===\n";
-    for (auto& s : gantt) cout << "[t=" << setw(2) << s.startTime << "→" << setw(2) << s.endTime << "] P" << s.pid << "\n";
+    for (size_t i=0;i<gantt.size();++i) cout << "[t=" << setw(2) << gantt[i].startTime << "->" << setw(2) << gantt[i].endTime << "] P" << gantt[i].pid << "\n";
 
     cout << "\n=== Per-Tick View ===\n";
     int startT = procs.empty() ? 0 : min_arrival(procs);
     int endT = max_end(gantt);
     for (int t = startT; t < endT; ++t) {
         int runningPid = -1;
-        for (auto& s : gantt) if (t >= s.startTime && t < s.endTime) { runningPid = s.pid; break; }
-        cout << "[Time " << t << "] RUN: " << (runningPid==-1? string("(idle)") : "P"+to_string(runningPid)) << "\n";
+        for (size_t i=0;i<gantt.size();++i) if (t >= gantt[i].startTime && t < gantt[i].endTime) { runningPid = gantt[i].pid; break; }
+        cout << "[Time " << t << "] RUN: " << (runningPid==-1? string("(idle)") : string("P")+to_string(runningPid)) << "\n";
     }
 
     double avgTAT = 0.0, avgWT = 0.0;
     cout << "\n=== Results ===\n";
     cout << "PID\tAT\tBT\tCT\tTAT\tWT\n";
-    for (const auto& p : procs) {
-        int pid=p.getPid(), arrival=p.getArrivalTime(), burst=p.getBurstTime();
-        int completion=0; for (auto& s : gantt) if (s.pid==pid) completion = max(completion, s.endTime);
-        int tat=p.getTurnaroundTime(), wt=p.getWaitingTime();
+    for (size_t i=0;i<procs.size();++i) {
+        int pid=procs[i].getPid(), arrival=procs[i].getArrivalTime(), burst=procs[i].getBurstTime();
+        int completion=0; for (size_t j=0;j<gantt.size();++j) if (gantt[j].pid==pid) completion = max(completion, gantt[j].endTime);
+        int tat=procs[i].getTurnaroundTime(), wt=procs[i].getWaitingTime();
         avgTAT += tat; avgWT += wt;
         cout << pid << '\t' << arrival << '\t' << burst << '\t' << completion << '\t' << tat << '\t' << wt << '\n';
     }
-    if (n>0) { avgTAT/=n; avgWT/=n; }
+    if (!procs.empty()) { avgTAT/=procs.size(); avgWT/=procs.size(); }
     cout << fixed << setprecision(2);
     cout << "Average Turnaround Time: " << avgTAT << "\n";
     cout << "Average Waiting Time:    " << avgWT << "\n";
@@ -91,9 +89,9 @@ static void run_vm_shell() {
         if (!(cin >> cmd)) return;
         if (cmd=="back") return;
         if (cmd=="init") { size_t ps; int vp,fr,tlb; string pol="CLOCK"; cin>>ps>>vp>>fr>>tlb; if (cin.peek()==' ') cin>>pol; vm.init(ps,vp,fr,tlb,pol); cout<<"ok\n"; }
-        else if (cmd=="read") { uint64_t a; cin>>a; try{ cout<<(int)vm.read(a)<<"\n"; }catch(std::exception& e){ cout<<"err\n"; } }
-        else if (cmd=="write") { uint64_t a; int b; cin>>a>>b; try{ vm.write(a,(uint8_t)(b&0xFF)); cout<<"ok\n"; }catch(std::exception& e){ cout<<"err\n"; } }
-        else if (cmd=="fill") { uint64_t a; size_t len; int b; cin>>a>>len>>b; try{ vm.fill(a,len,(uint8_t)(b&0xFF)); cout<<"ok\n"; }catch(std::exception& e){ cout<<"err\n"; } }
+        else if (cmd=="read") { uint64_t a; cin>>a; try{ cout<<(int)vm.read(a)<<"\n"; }catch(std::exception&){ cout<<"err\n"; } }
+        else if (cmd=="write") { uint64_t a; int b; cin>>a>>b; try{ vm.write(a,(uint8_t)(b&0xFF)); cout<<"ok\n"; }catch(std::exception&){ cout<<"err\n"; } }
+        else if (cmd=="fill") { uint64_t a; size_t len; int b; cin>>a>>len>>b; try{ vm.fill(a,len,(uint8_t)(b&0xFF)); cout<<"ok\n"; }catch(std::exception&){ cout<<"err\n"; } }
         else if (cmd=="seq") { uint64_t s; int ops; string w="r"; cin>>s>>ops; if (cin.peek()==' ') cin>>w; vm.seq(s,ops,(w=="w"||w=="W")); cout<<"ok\n"; }
         else if (cmd=="rand") { int ops; uint64_t mx; uint32_t seed=12345; string w="r"; cin>>ops>>mx; if (cin.peek()==' ') cin>>seed; if (cin.peek()==' ') cin>>w; vm.rnd(ops,mx,seed,(w=="w"||w=="W")); cout<<"ok\n"; }
         else if (cmd=="dumpvpn") { int v; cin>>v; vm.dumpVpn(v); }
